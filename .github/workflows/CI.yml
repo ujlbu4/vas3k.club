@@ -26,10 +26,10 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - name: run tests
-          run: |
-            ls -la
-            pwd
-            docker-compose -f docker-compose.test.yml run --rm tests
+        run: |
+          ls -la
+          pwd
+          docker-compose -f docker-compose.test.yml run --rm tests
 
 
   dockerize:
