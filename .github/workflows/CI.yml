@@ -34,17 +34,16 @@ jobs:
           export CPLUS_INCLUDE_PATH=/usr/include/gdal
           export C_INCLUDE_PATH=/usr/include/gdal
 
-          apt-get update \
-            && apt-get dist-upgrade -y \
-            && apt-get install --no-install-recommends -yq \
+          sudo apt-get update \
+            && sudo apt-get dist-upgrade -y \
+            && sudo apt-get install --no-install-recommends -yq \
               gcc \
               g++ \
               libc-dev \
               libpq-dev \
               gdal-bin \
               libgdal-dev \
-              make \
-            && rm -rf /var/lib/apt/lists/*
+              make 
       - name: Install requirements
         run: |
           pip install -r requirements.txt || true
