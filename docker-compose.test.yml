@@ -7,8 +7,8 @@ services:
       context: .
     command: make test-ci
     container_name: tests
-  depends_on:
-    - postgres
+    depends_on:
+      - postgres
 
   postgres:
     image: postgres:11
