@@ -7,6 +7,15 @@ services:
       context: .
     command: make test-ci
     container_name: tests
+    environment:
+      - DEBUG=true
+      - PYTHONUNBUFFERED=1
+      - POSTGRES_DB=vas3k_club
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=postgres
+      - REDIS_DB=0
+      - REDIS_HOST=redis
     depends_on:
       - postgres
 
