@@ -1,0 +1,10 @@
+version: "3.7"
+
+services:
+  tests:
+    build:
+      dockerfile: dev.dockerfile
+      context: .
+    command: make test-ci
+    container_name: tests
+    
