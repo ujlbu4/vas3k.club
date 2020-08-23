@@ -30,7 +30,7 @@ jobs:
           docker-compose -f docker-compose.test.yml build
       - name: run postgres
         run: |
-          docker-compose -f docker-compose.test.yml up postgres
+          docker-compose -f docker-compose.test.yml up -d postgres
       - name: wait postgres
         run: |
           python ./utils/wait_for_postgres.py
