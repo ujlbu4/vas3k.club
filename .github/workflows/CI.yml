@@ -29,6 +29,22 @@ jobs:
         with:
           python-version: '3.8'
           architecture: 'x64'
+      - name: Setup environment
+        run: |
+          export CPLUS_INCLUDE_PATH=/usr/include/gdal
+          export C_INCLUDE_PATH=/usr/include/gdal
+
+          apt-get update \
+            && apt-get dist-upgrade -y \
+            && apt-get install --no-install-recommends -yq \
+              gcc \
+              g++ \
+              libc-dev \
+              libpq-dev \
+              gdal-bin \
+              libgdal-dev \
+              make \
+            && rm -rf /var/lib/apt/lists/*
       - name: Install requirements
         run: |
           pip install -r requirements.txt || true
