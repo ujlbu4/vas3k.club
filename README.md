@@ -37,14 +37,62 @@ At the very beginning, you probably need a dev account to log in. Open [http://1
 Auto-reloading for backend and frontend is performed automatically on every code change. If everything is broken and not working (it happens), you can always rebuild the world from scratch using `docker-compose up --build`.
 
 ### Advanced setup:
-- To run telegram bot you have to:
-    1. Copy env.exmaple file: `cp ./club/.env.example ./club/.env`
-    2. Fill all the requirement fields in `./club/env`, such as `TELEGRAM_TOKEN` etc.
-        - `TELEGRAM_TOKEN` you can get from [@BotFather](https://t.me/BotFather)
-        - To get `TELEGRAM_CLUB_CHANNEL_URL`, `TELEGRAM_ADMIN_CHAT_ID` etc Just Simply Forward a message from your group/channel to [@JsonDumpBot](https://t.me/JsonDumpBot) or [@getidsbot](https://t.me/getidsbot)
-    3. Rebuild application: `docker-compose up --build`
 
+#### Telegram bot
+To run telegram bot you have to:
+  1. Copy env.exmaple file: `cp ./club/.env.example ./club/.env`
+  2. Fill all the requirement fields in `./club/env`, such as `TELEGRAM_TOKEN` etc.
+      - `TELEGRAM_TOKEN` you can get from [@BotFather](https://t.me/BotFather)
+      - To get `TELEGRAM_CLUB_CHANNEL_URL`, `TELEGRAM_ADMIN_CHAT_ID` etc Just Simply Forward a message from your group/channel to [@JsonDumpBot](https://t.me/JsonDumpBot) or [@getidsbot](https://t.me/getidsbot)
+  3. Rebuild application: `docker-compose up --build`
+
+#### Docker-compose
 Check out our [docker-compose.yml](https://github.com/vas3k/vas3k.club/blob/master/docker-compose.yml) to understand the infrastructure.
+
+#### Tests
+
+Basically tests automatically runs in CI in opened PR, but if you want to run tests **locally** there are few ways to do it
+1. virgin shell
+   ```sh
+   $ make test
+   ```
+2. venv shell
+   ```sh
+   $ source {your-venv-folder}/bin/activate
+   (venv) $ ./manage.py test
+   ```
+3. pycharm *profession edition*
+   Use `django tests` template out of the box
+4. pycharm *common edition*
+   - Make sure you have set `Unittest` as default test runner: Settings --> Tools --> Python Integrated Tools --> Default Test Runner: Unittests
+   ![Default Test Runner](_docs/images/pycharm-ce.settings.default-test-runner.png)
+   - In Run/Debug Configuration put `DJANGO_SETTINGS_MODULE=club.settings` in environment variables
+   ![Test template](_docs/images/pycharm-ce.debug-run-configurations.template.png)
+   - For workaround *"django.core.exceptions.AppRegistryNotReady: Apps aren't loaded yet."* add this lines to test file before importing models:
+     ```python
+     import django
+     django.setup()
+     ```
+
+
+
+##### Prerequisites
+Consider next required conditions for running tests :
+- venv 
+  Don't forget to run it under configurred venv. Look [TBD section]() how to configure venv
+- postgres
+  Due to our tests make database queries (namely in django notation, model tests) the local database should be running. How to setup local db look [TBD section]() 
+- builded frontend
+  For [views tests](https://docs.djangoproject.com/en/3.1/intro/tutorial05/#a-test-for-a-view) its essential to build our frontend upfront. Hot to build front look [probably-TBD section](), for now just run next commands:
+  ```sh
+  $ cd frontend
+  $ npm ci # or npm install
+  $ npm run build
+  ```
+  Above commands will create [required `webpack-stats.json`](https://github.com/vas3k/vas3k.club/blob/6f1812f36b546feba2bd729ac84011e20e237136/club/settings.py#L228) file
+
+
+For more information about testing in django look well written [official documentation](https://docs.djangoproject.com/en/3.1/topics/testing/overview/)
 
 ## 🛠 Tech stack
 
