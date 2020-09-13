@@ -5,7 +5,7 @@ import uuid
 
 import django
 from django.conf import settings
-from django.test import Client, TestCase
+from django.test import Client, TestCase, SimpleTestCase
 from django.urls import reverse
 from django.http.response import HttpResponseNotAllowed, HttpResponseBadRequest
 from django_q import brokers
@@ -608,3 +608,108 @@ class TestPatreonOauthCallback(TestCase):
     def test_param_code_absent(self, mocked_patreon=None):
         response = self.client.get(reverse('patreon_oauth_callback'), data={})
         self.assertContains(response=response, text="Что-то сломалось между нами и патреоном", status_code=200)
+
+
+from auth.providers.patreon import parse_active_membership
+
+
+class UnitTestsParseActiveMembership(SimpleTestCase):
+    def setUp(self):
+        self.stub_patreon_response_oauth_identity = {
+            "data": {
+                "attributes": {
+                    "about": "A Patreon Platform User",
+                    "created": "2018-04-01T00:36:26+00:00",
+                    "email": "user-email@email.com",
+                    "first_name": "Firstname",
+                    "full_name": "FullName With Space",
+                    "image_url": "https://url.example",
+                    "last_name": "Lastname",
+                    "social_connections": {
+                        "deviantart": None,
+                        "discord": None,
+                        "facebook": None,
+                        "reddit": None,
+                        "spotify": None,
+                        "twitch": None,
+                        "twitter": {
+                            "user_id": "12345"
+                        },
+                        "youtube": None
+                    },
+                    "thumb_url": "https://url.example",
+                    "url": "https://www.patreon.com/example",
+                    "vanity": "platform"
+                },
+                "id": "12345689",
+                "type": "user"
+            },
+            "included": [
+                {
+                    "attributes": {
+                        "full_name": "Member FullName",
+                        "email": "member-email@email.com",
+                        "is_follower": False,
+                        "last_charge_date": "2018-04-01T21:28:06+00:00",
+                        "last_charge_status": "Paid",
+                        "lifetime_support_cents": 400,
+                        "patron_status": "active_patron",
+                        "currently_entitled_amount_cents": 100,
+                        "pledge_relationship_start": "2018-04-01T16:33:27.861405+00:00",
+                        "will_pay_amount_cents": 100
+                    },
+                    "id": "03ca69c3-ebea-4b9a-8fac-e4a837873254",
+                    "type": "member"
+                }
+            ]
+        }
+
+    def test_successful_parsed(self):
+        result: Membership = parse_active_membership(self.stub_patreon_response_oauth_identity)
+
+        self.assertIsNotNone(result)
+        self.assertTrue(isinstance(result, Membership))
+
+        self.assertEqual(result.platform, "patreon")
+        self.assertEqual(result.user_id, "12345689")
+        self.assertEqual(result.full_name, "FullName With Space")
+        self.assertEqual(result.email, "user-email@email.com")
+        self.assertEqual(result.image, None)
+        self.assertEqual(result.started_at, datetime(2018, 4, 1, 0, 0))
+        self.assertEqual(result.expires_at, datetime(2018, 5, 16, 0, 0))
+        self.assertEqual(result.lifetime_support_cents, 400)
+        self.assertEqual(result.currently_entitled_amount_cents, 100)
+
+    def test_successful_god_id(self):
+        with self.settings(PATREON_GOD_IDS=['12345689']):
+            result: Membership = parse_active_membership(self.stub_patreon_response_oauth_identity)
+
+            self.assertIsNotNone(result)
+            self.assertTrue(isinstance(result, Membership))
+
+            self.assertEqual(result.platform, "patreon")
+            self.assertEqual(result.user_id, "12345689")
+            self.assertEqual(result.full_name, "FullName With Space")
+            self.assertEqual(result.email, "user-email@email.com")
+            self.assertEqual(result.image, 'https://url.example')
+
+            self.assertGreaterEqual(result.started_at, datetime.utcnow() - timedelta(seconds=5))
+            self.assertLessEqual(result.started_at, datetime.utcnow() + timedelta(seconds=5))
+
+            self.assertGreaterEqual(result.expires_at,
+                                    datetime.utcnow() + timedelta(days=100 * 365) - timedelta(seconds=5))
+            self.assertLessEqual(result.expires_at,
+                                 datetime.utcnow() + timedelta(days=100 * 365) + timedelta(seconds=5))
+
+            self.assertEqual(result.lifetime_support_cents, -1)
+            self.assertEqual(result.currently_entitled_amount_cents, 0)
+
+    def test_wrong_data(self):
+        result = parse_active_membership({})
+        self.assertIsNone(result)
+
+        result = parse_active_membership({"data": {}})  # no included
+        self.assertIsNone(result)
+
+        result = parse_active_membership({"included": {}})  # no data
+        self.assertIsNone(result)
