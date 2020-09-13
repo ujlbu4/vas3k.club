@@ -488,6 +488,7 @@ class TestPatreonLoginView(TestCase):
 
 
 from auth.providers.common import Membership, Platform
+from auth.exceptions import PatreonException
 
 
 @patch('auth.views.patreon.patreon')
@@ -514,54 +515,7 @@ class TestPatreonOauthCallback(TestCase):
             "scope": "scope??",
             "token_type": "Bearer"
         }
-        self.stub_patreon_response_oauth_identity = {
-            "data": {
-                "attributes": {
-                    "about": "A Patreon Platform User",
-                    "created": "2018-04-01T00:36:26+00:00",
-                    "email": self.patreon_member_email,
-                    "first_name": "Firstname",
-                    "full_name": "FullName With Space",
-                    "image_url": "https://url.example",
-                    "last_name": "Lastname",
-                    "social_connections": {
-                        "deviantart": None,
-                        "discord": None,
-                        "facebook": None,
-                        "reddit": None,
-                        "spotify": None,
-                        "twitch": None,
-                        "twitter": {
-                            "user_id": "12345"
-                        },
-                        "youtube": None
-                    },
-                    "thumb_url": "https://url.example",
-                    "url": "https://www.patreon.com/example",
-                    "vanity": "platform"
-                },
-                "id": "12345689",
-                "type": "user"
-            },
-            "included": [
-                {
-                    "attributes": {
-                        "full_name": "Member FullName ",
-                        "email": self.patreon_member_email,
-                        "is_follower": False,
-                        "last_charge_date": "2018-04-01T21:28:06+00:00",
-                        "last_charge_status": "Paid",
-                        "lifetime_support_cents": 400,
-                        "patron_status": "active_patron",
-                        "currently_entitled_amount_cents": 100,
-                        "pledge_relationship_start": "2018-04-01T16:33:27.861405+00:00",
-                        "will_pay_amount_cents": 100
-                    },
-                    "id": "03ca69c3-ebea-4b9a-8fac-e4a837873254",
-                    "type": "member"
-                }
-            ]
-        }
+        self.stub_patreon_response_oauth_identity = None  # doesn't need for now
         self.stub_parse_membership = Membership(
             platform=Platform.patreon,
             user_id=str(uuid.uuid4()),
@@ -628,12 +582,29 @@ class TestPatreonOauthCallback(TestCase):
         self.assertEqual(created_user.membership_platform_data, {'access_token': 'xxx-access-token',
                                                                  'refresh_token': 'xxx-refresh-token'})
 
-    def test_patreon_invalid_grant(self):
-        self.assertTrue(False)
+    def test_patreon_exception(self, mocked_patreon):
+        # given
+        mocked_patreon.fetch_auth_data.side_effect = PatreonException("custom_test_exception")
 
-    def test_patreon_not_membership(self):
-        self.assertTrue(False)
+        # when
+        response = self.client.get(reverse('patreon_oauth_callback'), data={'code': '1234'})
 
-    def test_param_code_absent(self):
+        # then
+        self.assertContains(response=response, text="Не получилось загрузить ваш профиль с серверов патреона",
+                            status_code=200)
+
+    def test_patreon_not_membership(self, mocked_patreon):
+        # given
+        mocked_patreon.fetch_auth_data.return_value = self.stub_patreon_response_oauth_token
+        mocked_patreon.fetch_user_data.return_value = None
+        mocked_patreon.parse_active_membership.return_value = None  # no membership
+
+        # when
+        response = self.client.get(reverse('patreon_oauth_callback'), data={'code': '1234'})
+
+        # then
+        self.assertContains(response=response, text="Надо быть патроном, чтобы состоять в Клубе", status_code=200)
+
+    def test_param_code_absent(self, mocked_patreon=None):
         response = self.client.get(reverse('patreon_oauth_callback'), data={})
         self.assertContains(response=response, text="Что-то сломалось между нами и патреоном", status_code=200)
