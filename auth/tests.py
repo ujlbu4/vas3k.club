@@ -11,6 +11,7 @@ from django_q import brokers
 from django_q.signing import SignedPackage
 import jwt
 from unittest import skip
+from unittest.mock import patch
 
 django.setup()  # todo: how to run tests from PyCharm without this workaround?
 
@@ -483,3 +484,115 @@ class TestPatreonLoginView(TestCase):
             self.assertRedirects(response=response,
                                  expected_url='https://www.patreon.com/oauth2/authorize?client_id=x-client_id&redirect_uri=http%3A%2F%2Fx-redirect_url.com&response_type=code&scope=x-scope',
                                  fetch_redirect_response=False)
+
+
+# @patch('auth.views.patreon.patreon.fetch_auth_data')
+# @patch('auth.views.patreon.patreon.fetch_user_data')
+from auth.providers.common import Membership, Platform
+
+
+@patch('auth.views.patreon.patreon')
+class TestPatreonOauthCallback(TestCase):
+
+    def setUp(self):
+        self.client = HelperClient()
+
+        self.patreon_member_email = "platform@patreon.com"
+        self.patreon_member_id = "12345"
+        self.stub_patreon_response_oauth_token = {
+            "access_token": "xxx-access-token",
+            "refresh_token": "xxx-refresh-token",
+            "expires_in": (datetime.utcnow() + timedelta(minutes=5)).microsecond,
+            "scope": "scope??",
+            "token_type": "Bearer"
+        }
+        self.stub_patreon_response_oauth_identity = {
+            "data": {
+                "attributes": {
+                    "about": "A Patreon Platform User",
+                    "created": "2018-04-01T00:36:26+00:00",
+                    "email": self.patreon_member_email,
+                    "first_name": "Firstname",
+                    "full_name": "FullName With Space",
+                    "image_url": "https://url.example",
+                    "last_name": "Lastname",
+                    "social_connections": {
+                        "deviantart": None,
+                        "discord": None,
+                        "facebook": None,
+                        "reddit": None,
+                        "spotify": None,
+                        "twitch": None,
+                        "twitter": {
+                            "user_id": "12345"
+                        },
+                        "youtube": None
+                    },
+                    "thumb_url": "https://url.example",
+                    "url": "https://www.patreon.com/example",
+                    "vanity": "platform"
+                },
+                "id": "12345689",
+                "type": "user"
+            },
+            "included": [
+                {
+                    "attributes": {
+                        "full_name": "Member FullName ",
+                        "email": self.patreon_member_email,
+                        "is_follower": False,
+                        "last_charge_date": "2018-04-01T21:28:06+00:00",
+                        "last_charge_status": "Paid",
+                        "lifetime_support_cents": 400,
+                        "patron_status": "active_patron",
+                        "currently_entitled_amount_cents": 100,
+                        "pledge_relationship_start": "2018-04-01T16:33:27.861405+00:00",
+                        "will_pay_amount_cents": 100
+                    },
+                    "id": "03ca69c3-ebea-4b9a-8fac-e4a837873254",
+                    "type": "member"
+                }
+            ]
+        }
+        self.stub_parse_membership = Membership(
+            platform=Platform.patreon,
+            user_id=self.patreon_member_id,
+            full_name="PatreonMember FullName",
+            email=self.patreon_member_email,
+            image="http://xxx.url",
+            started_at=datetime.utcnow(),
+            charged_at=None,
+            expires_at=datetime.utcnow() + timedelta(days=100 * 365),
+            lifetime_support_cents=-1,
+            currently_entitled_amount_cents=0
+        )
+
+    def test_successful_login_new_member(self, mocked_patreon):
+        # given
+        mocked_patreon.fetch_auth_data.return_value = self.stub_patreon_response_oauth_token
+        mocked_patreon.fetch_user_data.return_value = self.stub_patreon_response_oauth_identity
+        mocked_patreon.parse_active_membership.return_value = self.stub_parse_membership
+
+        # when
+        response = self.client.get(reverse('patreon_oauth_callback'), data={'code': '1234'})
+
+        self.assertRedirects(response=response, expected_url=f'/user/PatreonMemberFullName/',
+                             fetch_redirect_response=False)
+        self.assertTrue(self.client.is_authorised())
+        # self.assertTrue(User.objects.get(id=self.new_user.id).is_email_verified)
+        # todo: others checks
+
+        self.assertTrue(False)
+
+    def test_successful_login_existed_member(self):
+        self.assertTrue(False)
+
+    def test_patreon_invalid_grant(self):
+        self.assertTrue(False)
+
+    def test_patreon_not_membership(self):
+        self.assertTrue(False)
+
+    def test_param_code_absent(self):
+        response = self.client.get(reverse('patreon_oauth_callback'), data={})
+        self.assertContains(response=response, text="Что-то сломалось между нами и патреоном", status_code=200)
