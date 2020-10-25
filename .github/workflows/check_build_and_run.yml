@@ -1,4 +1,4 @@
-name: check_pr
+name: Check it could be build and run from scratch
 
 on: [pull_request]
 
